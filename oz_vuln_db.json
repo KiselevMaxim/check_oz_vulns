@@ -1,0 +1,143 @@
+{
+  "schema_version": "1.0",
+  "updated_at": "2025-05-11",
+  "source": "https://github.com/OpenZeppelin/openzeppelin-contracts/security/advisories",
+  "notes": "affected: [[min_inclusive, max_exclusive], ...]; patched — первые исправленные версии для каждой ветки. packages указывает на каноничные npm-имена; soldeer/foundry-варианты разрешает сам сканер.",
+  "vulnerabilities": [
+    {
+      "id": "GHSA-fg47-3c2x-m2wr",
+      "cve": "CVE-2021-39167",
+      "severity": "Critical",
+      "title": "TimelockController privilege escalation",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["3.3.0", "3.4.2"], ["4.0.0", "4.3.1"]],
+      "patched": ["3.4.2", "4.3.1"]
+    },
+    {
+      "id": "GHSA-5vp3-v4hc-gx76",
+      "cve": null,
+      "severity": "Critical",
+      "title": "UUPSUpgradeable: uninitialized implementation attack",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["4.1.0", "4.3.2"]],
+      "patched": ["4.3.2"]
+    },
+    {
+      "id": "OZ-4.9.4-multicall",
+      "cve": null,
+      "severity": "High",
+      "title": "Multicall: double delegatecall execution",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["4.9.4", "4.9.5"]],
+      "patched": ["4.9.5"]
+    },
+    {
+      "id": "GHSA-wprv-93r4-jj2p",
+      "cve": null,
+      "severity": "High",
+      "title": "MerkleProof: multiproof forgery",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["4.7.0", "4.9.2"]],
+      "patched": ["4.9.2"]
+    },
+    {
+      "id": "GHSA-4h98-2769-gh6h",
+      "cve": "CVE-2022-35961",
+      "severity": "High",
+      "title": "ECDSA signature malleability (EIP-2098 compact sigs)",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["4.1.0", "4.7.3"]],
+      "patched": ["4.7.3"]
+    },
+    {
+      "id": "GHSA-xrc4-737v-9q75",
+      "cve": "CVE-2022-31198",
+      "severity": "High",
+      "title": "GovernorVotesQuorumFraction: past-proposal manipulation",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["4.3.0", "4.7.2"]],
+      "patched": ["4.7.2"]
+    },
+    {
+      "id": "OZ-4.7.2-erc165checker",
+      "cve": null,
+      "severity": "High",
+      "title": "ERC165Checker: large returndata DoS",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["4.0.0", "4.7.2"]],
+      "patched": ["4.7.2"]
+    },
+    {
+      "id": "GHSA-9c22-pwxw-p6hx",
+      "cve": null,
+      "severity": "High",
+      "title": "Initializer reentrancy via untrusted external call",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["3.2.0", "4.4.1"]],
+      "patched": ["4.4.1"]
+    },
+    {
+      "id": "GHSA-g4vp-m682-qqmp",
+      "cve": "CVE-2023-40014",
+      "severity": "High",
+      "title": "ERC2771Context: _msgSender returns address(0) on short calldata",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["4.0.0", "4.9.3"]],
+      "patched": ["4.9.3"]
+    },
+    {
+      "id": "GHSA-wmpv-c2jp-j2xg",
+      "cve": null,
+      "severity": "Medium",
+      "title": "ERC1155Supply: totalSupply inconsistency on untrusted mint",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["3.1.0", "4.3.3"]],
+      "patched": ["4.3.3"]
+    },
+    {
+      "id": "GHSA-878m-3g6q-594q",
+      "cve": "CVE-2023-26488",
+      "severity": "Medium",
+      "title": "ERC721Consecutive: balance overflow (batch size 1)",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["4.8.0", "4.8.2"]],
+      "patched": ["4.8.2"]
+    },
+    {
+      "id": "OZ-4.7.2-sigchecker",
+      "cve": null,
+      "severity": "Medium",
+      "title": "SignatureChecker: reverts on ill-encoded return data",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["4.1.0", "4.7.2"]],
+      "patched": ["4.7.2"]
+    },
+    {
+      "id": "GHSA-7j52-6fjp-58gr",
+      "cve": null,
+      "severity": "Medium",
+      "title": "ERC2771ContextUpgradeable: storage layout incompatibility",
+      "packages": ["@openzeppelin/contracts-upgradeable"],
+      "affected": [["4.3.0", "4.5.0"]],
+      "patched": ["4.5.0"]
+    },
+    {
+      "id": "GHSA-9vx6-7xxf-x967",
+      "cve": null,
+      "severity": "Low",
+      "title": "Base64.encode reads dirty memory beyond input buffer",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["4.5.0", "4.9.6"], ["5.0.0", "5.0.2"]],
+      "patched": ["4.9.6", "5.0.2"]
+    },
+    {
+      "id": "GHSA-9rcw-c2f9-2j55",
+      "cve": null,
+      "severity": "Low",
+      "title": "Bytes.lastIndexOf: out-of-bound on empty buffer",
+      "packages": ["@openzeppelin/contracts", "@openzeppelin/contracts-upgradeable"],
+      "affected": [["5.1.0", "5.4.0"]],
+      "patched": ["5.4.0"]
+    }
+  ]
+}
