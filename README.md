@@ -17,22 +17,25 @@ Place both files in the same directory.
 
 ## What it checks
 
-The scanner searches for four manifest files in the specified branch/directory
-and audits each one when present:
+The scanner searches for the following manifest files in the specified
+branch/directory and audits each one when present:
 
 | File | Version source | Precision |
 |---|---|---|
 | `package.json` | Declared npm ranges | Approximate (`^4.7.0`) |
-| `package-lock.json` | Resolved installed versions | **Exact** (takes priority) |
+| `package-lock.json` | npm v1/v2/v3 resolved tree | **Exact** |
+| `yarn.lock` | Yarn v1 (classic) and v2+ (Berry) | **Exact** |
+| `pnpm-lock.yaml` | pnpm v5 / v6 / v9 `packages:` section | **Exact** |
 | `foundry.toml` | Soldeer `[dependencies]` | **Exact** |
 | `remappings.txt` + `.gitmodules` | git submodule path | SHA commit — requires manual tag lookup |
 
-When the same CVE appears in both `package-lock.json` (`[exact]`) and
-`package.json` (`[range]`), the duplicate range finding is discarded and
-only the exact one is reported.
+When the same CVE appears in both a lockfile (`[exact]`) and `package.json`
+(`[range]`), the duplicate range finding is discarded and only the exact
+one is reported.
 
 Range findings that do not apply to the currently installed version are kept
-as a signal that running `npm update` could introduce the vulnerability.
+as a signal that running `npm update` / `yarn up` / `pnpm update` could
+introduce the vulnerability.
 
 ## Usage
 
@@ -135,8 +138,9 @@ recommended but is outside the scope of this script.
    top-level declarations are visible. `package-lock.json` exposes the full
    resolved dependency tree.
 
-3. **Yarn lock / pnpm lock not supported.** Only `package-lock.json` v1/v2/v3
-   is parsed. Yarn and pnpm support can be added following the same pattern.
+3. **Lockfile coverage.** `package-lock.json` v1/v2/v3, `yarn.lock` v1 and
+   v2+ Berry, and `pnpm-lock.yaml` v5/v6/v9 are supported. Older or
+   experimental lockfile formats may not parse correctly.
 
 4. **Pre-release suffixes are stripped.** `4.9.4-rc.0` is treated as `4.9.4`.
 

@@ -3,9 +3,11 @@
 OpenZeppelin Vulnerability Scanner (v2)
 
 Accepts a GitHub branch/directory URL (no filename) or a local path,
-searches for four manifest files:
+searches for the following manifest files:
     • package.json          — npm declarations
-    • package-lock.json     — resolved installed versions (if present)
+    • package-lock.json     — npm resolved versions (if present)
+    • yarn.lock             — Yarn v1 (classic) and v2+ (Berry) resolved versions
+    • pnpm-lock.yaml        — pnpm v5 / v6 / v9 resolved versions
     • foundry.toml          — Foundry / Soldeer config
     • remappings.txt        — Foundry remappings (OZ git-submodule detection)
 Plus .gitmodules — used to resolve the OZ submodule SHA when present.
@@ -424,6 +426,164 @@ def audit_package_lock(text: str, vulndb: List[dict]) -> List[Finding]:
     return out
 
 
+def parse_yarn_lock(text: str) -> List[Tuple[str, str]]:
+    """Parse yarn.lock (v1 classic and v2+ Berry).
+
+    Returns deduped (package_name, resolved_version) tuples.
+
+    v1 (classic) entries look like:
+        "@openzeppelin/contracts@^4.7.0":
+          version "4.7.1"
+          resolved "https://..."
+
+    v2+ (Berry) entries use YAML-style colons:
+        "@openzeppelin/contracts@npm:^4.7.0":
+          version: 4.7.1
+          resolution: "@openzeppelin/contracts@npm:4.7.1"
+    """
+    out: List[Tuple[str, str]] = []
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.rstrip()
+        # A header line: starts at column 0, ends with ':', not a comment
+        if (stripped
+                and not line.startswith((" ", "\t", "#"))
+                and stripped.endswith(":")):
+            header = stripped[:-1]  # drop trailing ':'
+
+            # Parse package names from one or more comma-separated specs.
+            pkg_names = set()
+            for spec in header.split(","):
+                s = spec.strip().strip('"').strip("'")
+                if not s:
+                    continue
+                # Format: "<name>@<rangespec>". The LAST '@' separates them,
+                # but a leading '@' (scoped package) must not be split.
+                if s.startswith("@"):
+                    rest = s[1:]
+                    if "@" in rest:
+                        name_part, _ = rest.rsplit("@", 1)
+                        pkg_names.add("@" + name_part)
+                    else:
+                        pkg_names.add(s)
+                else:
+                    if "@" in s:
+                        name_part, _ = s.rsplit("@", 1)
+                        pkg_names.add(name_part)
+                    else:
+                        pkg_names.add(s)
+
+            # Look for an indented `version` line in the following block.
+            version = None
+            j = i + 1
+            while j < len(lines):
+                nxt = lines[j]
+                if not nxt.strip():
+                    j += 1
+                    continue
+                if not nxt.startswith((" ", "\t")):
+                    break  # left the block
+                # v1: version "4.7.1"   v2+: version: 4.7.1
+                m = re.match(r'\s*version\s*:?\s*"?([^"\s]+)"?', nxt)
+                if m:
+                    version = m.group(1).strip()
+                    break
+                j += 1
+
+            if version:
+                for name in pkg_names:
+                    out.append((name, version))
+            i = j
+            continue
+        i += 1
+
+    # Dedupe: identical (name, version) pairs collapse to one
+    return list(set(out))
+
+
+def audit_yarn_lock(text: str, vulndb: List[dict]) -> List[Finding]:
+    """Scan yarn.lock against the vuln DB."""
+    out: List[Finding] = []
+    for name, version in parse_yarn_lock(text):
+        out.extend(check_vulns(name, version, "yarn.lock", True, vulndb))
+    return out
+
+
+# --- pnpm-lock.yaml --------------------------------------------------------
+
+def _split_pnpm_key(raw_key: str) -> Optional[Tuple[str, str]]:
+    """Split a pnpm `packages:` key into (name, version).
+
+    Handles:
+        '/@scope/name@1.2.3'                     (v6+)
+        '/@scope/name/1.2.3'                     (v5)
+        '/name@1.2.3'
+        '@scope/name@1.2.3'                      (v9, no leading slash)
+        '/@scope/name@1.2.3(peer@1.0.0)'         (v6+ with peer suffix)
+        '/@scope/name/1.2.3_peer@1.0.0'          (v5 with peer suffix)
+    """
+    s = raw_key.strip()
+    # 1. Drop trailing ':' first, THEN trailing/leading quotes (order matters).
+    if s.endswith(":"):
+        s = s[:-1]
+    s = s.strip().strip("'\"").strip()
+    if s.startswith("/"):
+        s = s[1:]
+    # 2. Non-greedy name capture so peer-dep suffixes like (react@18.0.0)
+    #    don't get absorbed into the name.
+    m = re.match(r'^(.+?)[@/](\d+\.\d+\.\d+[^/@_(]*)', s)
+    if not m:
+        return None
+    return m.group(1), m.group(2)
+
+
+def parse_pnpm_lock(text: str) -> List[Tuple[str, str]]:
+    """Parse pnpm-lock.yaml (v5, v6, v9).
+
+    Returns deduped (package_name, resolved_version) tuples.
+
+    Only the `packages:` section is scanned (it has the full resolved tree).
+    Other sections (importers/dependencies/snapshots) are ignored to avoid
+    false positives.
+    """
+    out: List[Tuple[str, str]] = []
+    lines = text.splitlines()
+    in_packages = False
+
+    for line in lines:
+        # Skip blank/comment lines without affecting state
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+
+        # Top-level (column-0) key — enter or leave `packages:` section
+        if not line.startswith((" ", "\t")):
+            in_packages = line.strip().startswith("packages:")
+            continue
+
+        if not in_packages:
+            continue
+
+        # Inside `packages:` — match only direct child keys (lines ending in `:`)
+        if not line.rstrip().endswith(":"):
+            continue
+
+        pair = _split_pnpm_key(line)
+        if pair:
+            out.append(pair)
+
+    return list(set(out))
+
+
+def audit_pnpm_lock(text: str, vulndb: List[dict]) -> List[Finding]:
+    """Scan pnpm-lock.yaml against the vuln DB."""
+    out: List[Finding] = []
+    for name, version in parse_pnpm_lock(text):
+        out.extend(check_vulns(name, version, "pnpm-lock.yaml", True, vulndb))
+    return out
+
+
 def parse_toml_dependencies(text: str) -> Dict[str, str]:
     """Minimal parser for the [dependencies] section of foundry.toml (Soldeer format)."""
     deps: Dict[str, str] = {}
@@ -499,6 +659,7 @@ def parse_gitmodules(text: str) -> Dict[str, str]:
 # ===========================================================================
 
 MANIFEST_FILES = ("package.json", "package-lock.json",
+                  "yarn.lock", "pnpm-lock.yaml",
                   "foundry.toml", "remappings.txt", ".gitmodules")
 
 
@@ -553,13 +714,16 @@ def scan_source(source: str, vulndb: List[dict],
 
     if not found:
         res.error = ("No manifest file found in the specified directory "
-                     "(package.json / package-lock.json / foundry.toml / "
-                     "remappings.txt)")
+                     "(package.json / package-lock.json / yarn.lock / "
+                     "pnpm-lock.yaml / foundry.toml / remappings.txt)")
         return res
 
-    # ----- npm audit -----
+    # ----- npm / yarn / pnpm audit -----
     pkg_text = files.get("package.json")
-    lock_text = files.get("package-lock.json")
+    npm_lock_text = files.get("package-lock.json")
+    yarn_lock_text = files.get("yarn.lock")
+    pnpm_lock_text = files.get("pnpm-lock.yaml")
+    any_lockfile = any((npm_lock_text, yarn_lock_text, pnpm_lock_text))
 
     if pkg_text:
         try:
@@ -568,14 +732,30 @@ def scan_source(source: str, vulndb: List[dict],
             res.notes.append(Note("package.json", "warn",
                                   f"invalid JSON: {e}"))
 
-    if lock_text:
+    if npm_lock_text:
         try:
-            res.findings.extend(audit_package_lock(lock_text, vulndb))
+            res.findings.extend(audit_package_lock(npm_lock_text, vulndb))
         except json.JSONDecodeError as e:
             res.notes.append(Note("package-lock.json", "warn",
                                   f"invalid JSON: {e}"))
-    elif pkg_text:
-        # Warn only if OZ is actually declared in package.json
+
+    if yarn_lock_text:
+        try:
+            res.findings.extend(audit_yarn_lock(yarn_lock_text, vulndb))
+        except Exception as e:
+            res.notes.append(Note("yarn.lock", "warn",
+                                  f"parse error: {e}"))
+
+    if pnpm_lock_text:
+        try:
+            res.findings.extend(audit_pnpm_lock(pnpm_lock_text, vulndb))
+        except Exception as e:
+            res.notes.append(Note("pnpm-lock.yaml", "warn",
+                                  f"parse error: {e}"))
+
+    # If package.json declares OZ but no lockfile is present, warn that
+    # the actually installed version may differ from the declared range.
+    if pkg_text and not any_lockfile:
         try:
             pkg = json.loads(pkg_text)
             has_oz = any(canonical_name(n) in OZ_PACKAGES
@@ -585,8 +765,9 @@ def scan_source(source: str, vulndb: List[dict],
                          for n in (pkg.get(section) or {}))
             if has_oz:
                 res.notes.append(Note(
-                    "package-lock.json", "info",
-                    "No lockfile found — checking declared ranges only; "
+                    "lockfile", "info",
+                    "No lockfile found (package-lock.json / yarn.lock / "
+                    "pnpm-lock.yaml) — checking declared ranges only; "
                     "the actually installed version may differ."
                 ))
         except json.JSONDecodeError:
